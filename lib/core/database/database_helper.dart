@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -50,7 +50,8 @@ class DatabaseHelper {
         ownerId $textNullable,
         familyId $textNullable,
         isShared $integerNullable,
-        description $textNullable
+        description $textNullable,
+        groupId $textNullable
       )
     ''');
 
@@ -102,6 +103,11 @@ class DatabaseHelper {
     }
     if (oldVersion < 4) {
       await db.execute('ALTER TABLE transactions ADD COLUMN description TEXT');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE transactions ADD COLUMN groupId TEXT');
+      await db.execute('UPDATE transactions SET groupId = recurrenceParentId WHERE recurrenceParentId IS NOT NULL');
+      await db.execute('UPDATE transactions SET groupId = installmentParentId WHERE installmentParentId IS NOT NULL');
     }
   }
 

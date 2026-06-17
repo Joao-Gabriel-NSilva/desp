@@ -15,6 +15,12 @@ class FakeTransactionRepository implements TransactionRepository {
   Future<void> deleteTransaction(String id) async {}
   
   @override
+  Future<void> deleteTransactionWithScope(Transaction transaction, DeleteScope scope) async {}
+  
+  @override
+  Future<void> saveTransactionWithScope(Transaction transaction, EditScope scope) async {}
+  
+  @override
   Future<void> updateTransactionPaidStatus(String id, bool isPaid) async {}
   
   @override

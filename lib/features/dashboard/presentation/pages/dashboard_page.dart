@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/family_service.dart';
+import '../../domain/repositories/transaction_repository.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -11,8 +13,27 @@ import '../widgets/category_helper.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/transaction_list_item.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final bloc = context.read<DashboardBloc>();
+        final targetMonth = bloc.state is DashboardLoaded
+            ? (bloc.state as DashboardLoaded).targetMonth
+            : DateTime.now();
+        bloc.add(LoadDashboard(targetMonth: targetMonth));
+      }
+    });
+  }
 
   String _getMonthName(int month) {
     const months = [
@@ -44,6 +65,7 @@ class DashboardPage extends StatelessWidget {
         return BlocProvider.value(
           value: BlocProvider.of<DashboardBloc>(context),
           child: AddTransactionDialog(
+            initialDate: currentMonth,
             onSave: (transaction, totalInstallments, isRecurring) {
               context.read<DashboardBloc>().add(AddTransaction(
                     transaction: transaction,
@@ -58,7 +80,7 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  void _showEditTransaction(BuildContext context, Transaction transaction, DateTime currentMonth) {
+  void _showEditTransaction(BuildContext context, Transaction transaction, DateTime currentMonth, EditScope editScope) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -75,11 +97,132 @@ class DashboardPage extends StatelessWidget {
               context.read<DashboardBloc>().add(UpdateTransaction(
                     transaction: updatedTx,
                     targetMonth: currentMonth,
+                    editScope: editScope,
                   ));
             },
           ),
         );
       },
+    );
+  }
+
+  Future<void> _handleEditClick(BuildContext context, Transaction transaction, DateTime currentMonth) async {
+    final bool isRecurring = transaction.recurrenceParentId != null;
+    final bool isInstallment = transaction.installmentParentId != null;
+
+    if (!isRecurring && !isInstallment) {
+      _showEditTransaction(context, transaction, currentMonth, EditScope.onlyThis);
+      return;
+    }
+
+    final EditScope? scope = await showDialog<EditScope>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        title: Text(
+          isRecurring ? 'Editar Despesa Recorrente' : 'Editar Compra Parcelada',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          isRecurring
+              ? 'Esta é uma despesa recorrente. O que você deseja editar?'
+              : 'Esta é uma despesa parcelada. O que você deseja editar?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actionsOverflowButtonSpacing: 8,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(EditScope.onlyThis),
+            child: const Text('Apenas esta ocorrência', style: TextStyle(color: Color(0xFF6366F1))),
+          ),
+          if (isRecurring)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(EditScope.thisAndFuture),
+              child: const Text('Esta e as futuras', style: TextStyle(color: Color(0xFF6366F1))),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(EditScope.all),
+            child: Text(
+              isRecurring ? 'Toda a série' : 'Todas as parcelas',
+              style: const TextStyle(color: Color(0xFF6366F1)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (scope != null && context.mounted) {
+      _showEditTransaction(context, transaction, currentMonth, scope);
+    }
+  }
+
+  Future<DeleteScope?> _showDeleteScopeDialog(BuildContext context, Transaction transaction) async {
+    final bool isRecurring = transaction.recurrenceParentId != null;
+    final bool isInstallment = transaction.installmentParentId != null;
+
+    if (!isRecurring && !isInstallment) {
+      return showDialog<DeleteScope>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          title: const Text('Excluir Transação', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: Text('Deseja realmente excluir "${transaction.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(DeleteScope.onlyThis),
+              style: TextButton.styleFrom(foregroundColor: const Color(0xFFE11D48)),
+              child: const Text('Excluir'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return showDialog<DeleteScope>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        title: Text(
+          isRecurring ? 'Excluir Despesa Recorrente' : 'Excluir Compra Parcelada',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          isRecurring
+              ? 'Esta é uma despesa recorrente. Como deseja excluí-la?'
+              : 'Esta é uma despesa parcelada. Como deseja excluí-la?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actionsAlignment: MainAxisAlignment.end,
+        actionsOverflowButtonSpacing: 8,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(DeleteScope.onlyThis),
+            child: const Text('Apenas esta', style: TextStyle(color: Color(0xFF6366F1))),
+          ),
+          if (isRecurring)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(DeleteScope.thisAndFuture),
+              child: const Text('Esta e as futuras', style: TextStyle(color: Color(0xFF6366F1))),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(DeleteScope.all),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFFE11D48)),
+            child: Text(isRecurring ? 'Toda a série' : 'Todas as parcelas'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -121,7 +264,7 @@ class DashboardPage extends StatelessWidget {
         }
 
         if (state is DashboardLoaded) {
-          final transactions = state.transactions;
+          final transactions = state.filteredTransactions;
           final currentMonth = state.targetMonth;
           final hasUnpaidExpenses = transactions.any((t) => t.type == TransactionType.expense && !t.isPaid);
 
@@ -280,6 +423,11 @@ class DashboardPage extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                    if (user?.familyId != null)
+                      SliverToBoxAdapter(
+                        child: _buildMemberFilterChips(context, currentUserId, user!.familyId!, state.selectedMemberId),
+                      ),
 
                     // Cards Resumo
                     SliverToBoxAdapter(
@@ -537,23 +685,29 @@ class DashboardPage extends StatelessWidget {
                                       );
                                 },
                                 onEdit: () {
-                                  _showEditTransaction(context, transaction, currentMonth);
+                                  _handleEditClick(context, transaction, currentMonth);
                                 },
-                                onDelete: () {
-                                  context.read<DashboardBloc>().add(
-                                        DeleteTransaction(
-                                          transactionId: transaction.id,
-                                          targetMonth: currentMonth,
-                                        ),
-                                      );
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('"${transaction.title}" excluído.'),
-                                      backgroundColor: const Color(0xFF1E293B),
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
+                                onDelete: () async {
+                                  final scope = await _showDeleteScopeDialog(context, transaction);
+                                  if (scope != null && context.mounted) {
+                                    context.read<DashboardBloc>().add(
+                                          DeleteTransaction(
+                                            transactionId: transaction.id,
+                                            targetMonth: currentMonth,
+                                            deleteScope: scope,
+                                            transaction: transaction,
+                                          ),
+                                        );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('"${transaction.title}" excluído.'),
+                                        backgroundColor: const Color(0xFF1E293B),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                    return true;
+                                  }
+                                  return false;
                                 },
                               );
                             },
@@ -586,6 +740,71 @@ class DashboardPage extends StatelessWidget {
         return const SizedBox.shrink();
       },
     );
+      },
+    );
+  }
+
+  Widget _buildMemberFilterChips(BuildContext context, String currentUserId, String familyId, String? selectedFilter) {
+    return StreamBuilder<List<UserProfile>>(
+      stream: FamilyService.instance.getFamilyMembersStream(familyId),
+      builder: (context, snapshot) {
+        final List<Map<String, String>> filterOptions = [
+          {'id': currentUserId, 'name': 'Eu'},
+          {'id': 'all', 'name': 'Todos'},
+        ];
+
+        if (snapshot.hasData) {
+          for (var member in snapshot.data!) {
+            if (member.uid != currentUserId) {
+              filterOptions.add({'id': member.uid, 'name': member.username});
+            }
+          }
+        }
+
+        final activeFilter = selectedFilter ?? currentUserId;
+
+        return Container(
+          height: 48,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: filterOptions.length,
+            itemBuilder: (context, index) {
+              final option = filterOptions[index];
+              final isSelected = activeFilter == option['id'];
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(
+                    option['name']!,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFF6366F1),
+                  backgroundColor: const Color(0xFF1E293B),
+                  checkmarkColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: isSelected ? const Color(0xFF6366F1) : Colors.white.withValues(alpha: 0.04),
+                      width: 1,
+                    ),
+                  ),
+                  onSelected: (selected) {
+                    if (selected) {
+                      context.read<DashboardBloc>().add(ChangeMemberFilter(option['id']));
+                    }
+                  },
+                ),
+              );
+            },
+          ),
+        );
       },
     );
   }

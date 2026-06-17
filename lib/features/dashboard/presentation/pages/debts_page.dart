@@ -8,6 +8,8 @@ import '../bloc/dashboard_state.dart';
 import '../widgets/add_transaction_dialog.dart';
 import '../widgets/category_helper.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/family_service.dart';
+import '../../domain/entities/user_profile.dart';
 import 'transaction_detail_page.dart';
 
 class DebtsPage extends StatefulWidget {
@@ -19,6 +21,7 @@ class DebtsPage extends StatefulWidget {
 
 class _DebtsPageState extends State<DebtsPage> {
   String? _currentUserId;
+  String? _familyId;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _DebtsPageState extends State<DebtsPage> {
     if (mounted) {
       setState(() {
         _currentUserId = user?.uid;
+        _familyId = user?.familyId;
       });
     }
   }
@@ -50,6 +54,7 @@ class _DebtsPageState extends State<DebtsPage> {
           value: BlocProvider.of<DashboardBloc>(context),
           child: AddTransactionDialog(
             defaultIsPending: true,
+            initialDate: currentMonth,
             onSave: (transaction, totalInstallments, isRecurring) {
               context.read<DashboardBloc>().add(AddTransaction(
                     transaction: transaction,
@@ -89,7 +94,7 @@ class _DebtsPageState extends State<DebtsPage> {
           }
 
           if (state is DashboardLoaded) {
-            final debts = state.debts;
+            final debts = state.filteredDebts;
 
             return SafeArea(
               child: CustomScrollView(
@@ -119,6 +124,11 @@ class _DebtsPageState extends State<DebtsPage> {
                       ),
                     ),
                   ),
+
+                  if (_familyId != null && _currentUserId != null)
+                    SliverToBoxAdapter(
+                      child: _buildMemberFilterChips(context, _currentUserId!, _familyId!, state.selectedMemberId),
+                    ),
 
                   // Total Acumulado Card
                   SliverToBoxAdapter(
@@ -558,6 +568,71 @@ class _DebtsPageState extends State<DebtsPage> {
           return const SizedBox.shrink();
         },
       ),
+    );
+  }
+
+  Widget _buildMemberFilterChips(BuildContext context, String currentUserId, String familyId, String? selectedFilter) {
+    return StreamBuilder<List<UserProfile>>(
+      stream: FamilyService.instance.getFamilyMembersStream(familyId),
+      builder: (context, snapshot) {
+        final List<Map<String, String>> filterOptions = [
+          {'id': currentUserId, 'name': 'Eu'},
+          {'id': 'all', 'name': 'Todos'},
+        ];
+
+        if (snapshot.hasData) {
+          for (var member in snapshot.data!) {
+            if (member.uid != currentUserId) {
+              filterOptions.add({'id': member.uid, 'name': member.username});
+            }
+          }
+        }
+
+        final activeFilter = selectedFilter ?? currentUserId;
+
+        return Container(
+          height: 48,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: filterOptions.length,
+            itemBuilder: (context, index) {
+              final option = filterOptions[index];
+              final isSelected = activeFilter == option['id'];
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(
+                    option['name']!,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFF6366F1),
+                  backgroundColor: const Color(0xFF1E293B),
+                  checkmarkColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: isSelected ? const Color(0xFF6366F1) : Colors.white.withValues(alpha: 0.04),
+                      width: 1,
+                    ),
+                  ),
+                  onSelected: (selected) {
+                    if (selected) {
+                      context.read<DashboardBloc>().add(ChangeMemberFilter(option['id']));
+                    }
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

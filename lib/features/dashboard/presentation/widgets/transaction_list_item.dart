@@ -7,7 +7,7 @@ import 'category_helper.dart';
 
 class TransactionListItem extends StatelessWidget {
   final Transaction transaction;
-  final VoidCallback onDelete;
+  final Future<bool> Function() onDelete;
   final ValueChanged<bool>? onTogglePaid;
   final VoidCallback? onEdit;
   final String? currentUserId;
@@ -34,27 +34,9 @@ class TransactionListItem extends StatelessWidget {
       key: Key(transaction.id),
       direction: canModify ? DismissDirection.endToStart : DismissDirection.none,
       confirmDismiss: (direction) async {
-        // Confirmação ao deletar via swipe
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Excluir Transação'),
-            content: Text('Deseja realmente excluir a transação "${transaction.title}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: TextButton.styleFrom(foregroundColor: const Color(0xFFF43F5E)),
-                child: const Text('Excluir'),
-              ),
-            ],
-          ),
-        );
+        return await onDelete();
       },
-      onDismissed: (_) => onDelete(),
+      onDismissed: (_) {},
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
@@ -327,27 +309,7 @@ class TransactionListItem extends StatelessWidget {
                           if (value == 'edit') {
                             onEdit?.call();
                           } else if (value == 'delete') {
-                            final bool? confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Excluir Transação'),
-                                content: Text('Deseja realmente excluir a transação "${transaction.title}"?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(false),
-                                    child: const Text('Cancelar'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(true),
-                                    style: TextButton.styleFrom(foregroundColor: const Color(0xFFF43F5E)),
-                                    child: const Text('Excluir'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
-                              onDelete();
-                            }
+                            await onDelete();
                           }
                         },
                         itemBuilder: (context) => [

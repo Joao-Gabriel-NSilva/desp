@@ -51,6 +51,9 @@ class FirestoreSyncService {
     _activeFamilyId = familyId;
     debugPrint('Sync: Iniciando sincronização em tempo real para a família: $familyId');
 
+    bool reconciledFromServer = false;
+    bool reconciledFromCache = false;
+
     // Subscreve para ouvir alterações da família no Firestore
     _transactionSubscription = FirebaseFirestore.instance
         .collection('transactions')
@@ -59,6 +62,80 @@ class FirestoreSyncService {
         .listen(
       (snapshot) async {
         final db = await _dbHelper.database;
+        final isFromServer = !snapshot.metadata.isFromCache;
+
+        // Executa a reconciliação uma única vez por fonte (cache/servidor) para alinhar dados offline/deletados
+        final needReconcile = (isFromServer && !reconciledFromServer) || (!isFromServer && !reconciledFromCache);
+
+        if (needReconcile) {
+          if (isFromServer) {
+            reconciledFromServer = true;
+          } else {
+            reconciledFromCache = true;
+          }
+
+          debugPrint('Sync: Executando reconciliação inicial (${isFromServer ? "Servidor" : "Cache"})...');
+
+          // 1. Coleta todos os IDs de transações atualmente no Firestore para esta família
+          final firestoreIds = snapshot.docs.map((doc) => doc.id).toSet();
+
+          // 2. Busca todas as transações compartilhadas locais desta família no SQLite
+          final List<Map<String, dynamic>> localShared = await db.query(
+            'transactions',
+            columns: ['id', 'ownerId'],
+            where: 'isShared = 1 AND familyId = ?',
+            whereArgs: [familyId],
+          );
+
+          final List<String> localIdsToDelete = [];
+          final List<Transaction> localTransactionsToUpload = [];
+
+          for (var row in localShared) {
+            final id = row['id'] as String;
+            final ownerId = row['ownerId'] as String?;
+
+            if (!firestoreIds.contains(id)) {
+              if (ownerId != null && ownerId != user.uid) {
+                // Outro usuário deletou no Firestore enquanto estávamos offline
+                localIdsToDelete.add(id);
+              } else {
+                // Transação nossa (ou órfã) criada offline e que ainda não subiu para o Firestore
+                final List<Map<String, dynamic>> fullTxMap = await db.query(
+                  'transactions',
+                  where: 'id = ?',
+                  whereArgs: [id],
+                );
+                if (fullTxMap.isNotEmpty) {
+                  localTransactionsToUpload.add(TransactionModel.fromMap(fullTxMap.first));
+                }
+              }
+            }
+          }
+
+          // Executa as deleções locais em SQLite
+          if (localIdsToDelete.isNotEmpty) {
+            await db.transaction((txn) async {
+              final batch = txn.batch();
+              for (var id in localIdsToDelete) {
+                batch.delete(
+                  'transactions',
+                  where: 'id = ?',
+                  whereArgs: [id],
+                );
+              }
+              await batch.commit(noResult: true);
+            });
+            debugPrint('Sync: Reconciliação deletou ${localIdsToDelete.length} transações removidas na nuvem.');
+          }
+
+          // Executa upload das transações locais pendentes
+          if (localTransactionsToUpload.isNotEmpty) {
+            await uploadTransactions(localTransactionsToUpload);
+            debugPrint('Sync: Reconciliação enviou ${localTransactionsToUpload.length} transações locais ao Firestore.');
+          }
+        }
+
+        // 3. Processamento em tempo real das alterações do snapshot (added, modified, removed)
         await db.transaction((txn) async {
           for (var change in snapshot.docChanges) {
             final doc = change.doc;
@@ -68,7 +145,7 @@ class FirestoreSyncService {
 
             final transactionId = doc.id;
 
-            if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
+             if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
               // Converte dados do Firestore para mapeamento de banco local
               // Garante que o ID da transação seja o ID do documento
               final map = Map<String, dynamic>.from(data);
@@ -77,22 +154,48 @@ class FirestoreSyncService {
               // Como o SQLite armazena booleanos como 0/1, convertemos aqui se necessário
               final transactionModel = TransactionModel.fromMap(map);
 
-              await txn.insert(
+              // Evita escritas e prints redundantes se a transação já estiver salva localmente idêntica
+              final List<Map<String, dynamic>> local = await txn.query(
                 'transactions',
-                transactionModel.toMap(),
-                conflictAlgorithm: ConflictAlgorithm.replace,
+                where: 'id = ?',
+                whereArgs: [transactionId],
               );
-              debugPrint('Sync: Transação compartilhada salva/atualizada localmente: $transactionId');
-            } else if (change.type == DocumentChangeType.removed) {
-              // Se foi deletada no Firestore e o dono é outro usuário, deleta do SQLite local
-              final ownerId = data['ownerId'] as String?;
-              if (ownerId != user.uid) {
-                await txn.delete(
+
+              bool needsUpdate = true;
+              if (local.isNotEmpty) {
+                final localModel = TransactionModel.fromMap(local.first);
+                if (localModel == transactionModel) {
+                  needsUpdate = false;
+                }
+              }
+
+              if (needsUpdate) {
+                await txn.insert(
                   'transactions',
-                  where: 'id = ?',
-                  whereArgs: [transactionId],
+                  transactionModel.toMap(),
+                  conflictAlgorithm: ConflictAlgorithm.replace,
                 );
-                debugPrint('Sync: Transação compartilhada removida localmente: $transactionId');
+                debugPrint('Sync: Transação compartilhada salva/atualizada localmente: $transactionId');
+              }
+            } else if (change.type == DocumentChangeType.removed) {
+              // Se foi deletada no Firestore, removemos do SQLite local apenas se a transação local ainda estiver como compartilhada.
+              // Isso evita deletar transações locais que foram descompartilhadas pelo próprio dono (que salva com isShared = 0 localmente).
+              final List<Map<String, dynamic>> localTx = await txn.query(
+                'transactions',
+                columns: ['isShared'],
+                where: 'id = ?',
+                whereArgs: [transactionId],
+              );
+              if (localTx.isNotEmpty) {
+                final isShared = localTx.first['isShared'] == 1 || localTx.first['isShared'] == true;
+                if (isShared) {
+                  await txn.delete(
+                    'transactions',
+                    where: 'id = ?',
+                    whereArgs: [transactionId],
+                  );
+                  debugPrint('Sync: Transação compartilhada removida localmente por exclusão remota: $transactionId');
+                }
               }
             }
           }
@@ -157,6 +260,58 @@ class FirestoreSyncService {
       debugPrint('Sync: Deleção concluída no Firestore para transação $transactionId');
     } catch (e) {
       debugPrint('Sync: Erro ao deletar no Firestore (pode não existir na nuvem): $e');
+    }
+  }
+
+  /// Faz o upload de várias transações para o Firestore em lote
+  Future<void> uploadTransactions(List<Transaction> transactions) async {
+    if (!_isFirebaseAvailable) return;
+    if (transactions.isEmpty) return;
+
+    final user = await _authService.getCurrentUser();
+    if (user == null || user.familyId == null) return;
+
+    // Apenas transações compartilhadas são enviadas
+    final sharedTxs = transactions.where((tx) => tx.isShared).toList();
+    if (sharedTxs.isEmpty) return;
+
+    final batch = FirebaseFirestore.instance.batch();
+    for (var transaction in sharedTxs) {
+      final updatedTx = transaction.copyWith(
+        ownerId: transaction.ownerId ?? user.uid,
+        familyId: transaction.familyId ?? user.familyId,
+      );
+
+      final model = TransactionModel.fromEntity(updatedTx);
+      final map = model.toMap();
+
+      map['isPending'] = model.isPending;
+      map['isPaid'] = model.isPaid;
+      map['isShared'] = model.isShared;
+
+      final docRef = FirebaseFirestore.instance.collection('transactions').doc(model.id);
+      batch.set(docRef, map);
+    }
+
+    await batch.commit();
+    debugPrint('Sync: Upload em lote concluído para ${sharedTxs.length} transações.');
+  }
+
+  /// Deleta várias transações no Firestore em lote
+  Future<void> deleteTransactions(List<String> transactionIds) async {
+    if (!_isFirebaseAvailable) return;
+    if (transactionIds.isEmpty) return;
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      for (var id in transactionIds) {
+        final docRef = FirebaseFirestore.instance.collection('transactions').doc(id);
+        batch.delete(docRef);
+      }
+      await batch.commit();
+      debugPrint('Sync: Deleção em lote concluída no Firestore para ${transactionIds.length} transações.');
+    } catch (e) {
+      debugPrint('Sync: Erro ao deletar em lote no Firestore: $e');
     }
   }
 

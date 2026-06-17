@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dashboard_page.dart';
 import 'debts_page.dart';
 import '../widgets/app_drawer.dart';
+import '../bloc/dashboard_bloc.dart';
+import '../bloc/dashboard_event.dart';
+import '../bloc/dashboard_state.dart';
 
 class HomeNavigationPage extends StatefulWidget {
   const HomeNavigationPage({super.key});
@@ -18,17 +22,28 @@ class _HomeNavigationPageState extends State<HomeNavigationPage> {
     const DebtsPage(),
   ];
 
+  void _onTabSelected(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+    final bloc = context.read<DashboardBloc>();
+    if (index == 0) {
+      final targetMonth = bloc.state is DashboardLoaded
+          ? (bloc.state as DashboardLoaded).targetMonth
+          : DateTime.now();
+      bloc.add(LoadDashboard(targetMonth: targetMonth));
+    } else if (index == 1) {
+      bloc.add(LoadDebts());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
       drawer: AppDrawer(
-        onItemSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onItemSelected: _onTabSelected,
       ),
       body: IndexedStack(
         index: _currentIndex,
@@ -46,11 +61,7 @@ class _HomeNavigationPageState extends State<HomeNavigationPage> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
+          onTap: _onTabSelected,
           backgroundColor: Colors.transparent,
           elevation: 0,
           selectedItemColor: theme.primaryColor,

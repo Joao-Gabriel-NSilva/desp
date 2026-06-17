@@ -37,6 +37,7 @@ class Transaction extends Equatable {
   final String? familyId;
   final bool isShared;
   final String? description;
+  final String? groupId;
 
   const Transaction({
     required this.id,
@@ -56,6 +57,7 @@ class Transaction extends Equatable {
     this.familyId,
     this.isShared = false,
     this.description,
+    this.groupId,
   });
 
   Transaction copyWith({
@@ -76,6 +78,7 @@ class Transaction extends Equatable {
     String? familyId,
     bool? isShared,
     String? description,
+    String? groupId,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -95,6 +98,7 @@ class Transaction extends Equatable {
       familyId: familyId ?? this.familyId,
       isShared: isShared ?? this.isShared,
       description: description ?? this.description,
+      groupId: groupId ?? this.groupId,
     );
   }
 
@@ -117,5 +121,6 @@ class Transaction extends Equatable {
         familyId,
         isShared,
         description,
+        groupId,
       ];
 }

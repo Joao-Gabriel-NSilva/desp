@@ -4,15 +4,22 @@ import '../../data/services/auth_service.dart';
 import 'category_helper.dart';
 
 class AddTransactionDialog extends StatefulWidget {
-  final Function(Transaction transaction, int? totalInstallments, bool isRecurring) onSave;
+  final Function(
+    Transaction transaction,
+    int? totalInstallments,
+    bool isRecurring,
+  )
+  onSave;
   final Transaction? initialTransaction;
   final bool defaultIsPending;
+  final DateTime? initialDate;
 
   const AddTransactionDialog({
     super.key,
     required this.onSave,
     this.initialTransaction,
     this.defaultIsPending = false,
+    this.initialDate,
   });
 
   @override
@@ -24,11 +31,12 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+
   TransactionType _selectedType = TransactionType.expense;
   TransactionCategory _selectedCategory = TransactionCategory.food;
-  TransactionPaymentMethod _selectedPaymentMethod = TransactionPaymentMethod.pix;
-  
+  TransactionPaymentMethod _selectedPaymentMethod =
+      TransactionPaymentMethod.pix;
+
   bool _isPending = false;
   bool _isPaid = true;
   bool _isRecurring = false;
@@ -39,6 +47,42 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   bool _isShared = false;
   String? _currentUserUid;
   String? _currentUserFamilyId;
+
+  late DateTime _selectedDate;
+  bool _faturaMesSelecionado = false;
+
+  String _getMonthName(int month) {
+    const months = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
+    return months[month - 1];
+  }
+
+  DateTime _addMonths(DateTime date, int months) {
+    int year = date.year;
+    int month = date.month + months;
+    while (month > 12) {
+      year += 1;
+      month -= 12;
+    }
+    int day = date.day;
+    final int daysInMonth = DateTime(year, month + 1, 0).day;
+    if (day > daysInMonth) {
+      day = daysInMonth;
+    }
+    return DateTime(year, month, day, date.hour, date.minute, date.second);
+  }
 
   @override
   void initState() {
@@ -55,12 +99,17 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       _isPending = tx.isPending;
       _isPaid = tx.isPaid;
       _isShared = tx.isShared;
+      _selectedDate = tx.date;
+      _faturaMesSelecionado =
+          true; // Use a data informada por padrão para edições
     } else {
       _isPending = widget.defaultIsPending;
       if (_isPending) {
         _isPaid = false;
         _selectedType = TransactionType.expense;
       }
+      _selectedDate = widget.initialDate ?? DateTime.now();
+      _faturaMesSelecionado = false; // Por padrão desabilitado
     }
   }
 
@@ -85,7 +134,9 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
-      final double? amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
+      final double? amount = double.tryParse(
+        _amountController.text.replaceAll(',', '.'),
+      );
       if (amount == null || amount <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Por favor, insira um valor válido.')),
@@ -99,9 +150,17 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       final descText = _descriptionController.text.trim();
       final finalDescription = descText.isEmpty ? null : descText;
 
-      final transaction = widget.initialTransaction?.copyWith(
+      DateTime finalDate = _selectedDate;
+      if (_selectedPaymentMethod == TransactionPaymentMethod.credit &&
+          !_faturaMesSelecionado) {
+        finalDate = _addMonths(_selectedDate, 1);
+      }
+
+      final transaction =
+          widget.initialTransaction?.copyWith(
             title: _titleController.text.trim(),
             amount: amount,
+            date: finalDate,
             type: _selectedType,
             category: _selectedCategory,
             paymentMethod: _selectedPaymentMethod,
@@ -109,14 +168,15 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
             isPaid: finalIsPaid,
             isShared: _isShared,
             ownerId: widget.initialTransaction?.ownerId ?? _currentUserUid,
-            familyId: widget.initialTransaction?.familyId ?? _currentUserFamilyId,
+            familyId:
+                widget.initialTransaction?.familyId ?? _currentUserFamilyId,
             description: finalDescription,
           ) ??
           Transaction(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             title: _titleController.text.trim(),
             amount: amount,
-            date: DateTime.now(),
+            date: finalDate,
             type: _selectedType,
             category: _selectedCategory,
             paymentMethod: _selectedPaymentMethod,
@@ -152,7 +212,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
             TransactionCategory.leisure,
             TransactionCategory.utilities,
             TransactionCategory.subscription,
-            TransactionCategory.other
+            TransactionCategory.other,
           ];
 
     // Garante que a categoria selecionada é compatível
@@ -223,7 +283,8 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                         setState(() {
                           _selectedType = TransactionType.income;
                           _selectedCategory = TransactionCategory.salary;
-                          _isPending = false; // receita não pode ser dívida pendente
+                          _isPending =
+                              false; // receita não pode ser dívida pendente
                         });
                       },
                     ),
@@ -277,13 +338,18 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
               // Input de Valor
               TextFormField(
                 controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 style: const TextStyle(color: Colors.white, fontSize: 16),
                 decoration: const InputDecoration(
                   hintText: '0,00',
                   labelText: 'Valor',
                   prefixText: 'R\$ ',
-                  prefixStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  prefixStyle: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -291,6 +357,87 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 20),
+
+              // Seletor de Data
+              Text(
+                'Data do Lançamento',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                    helpText: 'SELECIONE O MÊS E ANO',
+                    builder: (context, child) {
+                      return Theme(
+                        data: theme.copyWith(
+                          colorScheme: theme.colorScheme.copyWith(
+                            primary: theme.primaryColor,
+                            onPrimary: Colors.white,
+                            surface: const Color(0xFF1E293B),
+                            onSurface: Colors.white,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      _selectedDate = DateTime(picked.year, picked.month, 1);
+                    });
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: darkSurfaceLight.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_month_rounded,
+                            color: theme.primaryColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${_getMonthName(_selectedDate.month)} de ${_selectedDate.year}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down_rounded,
+                        color: Colors.white54,
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -310,7 +457,8 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4.0),
                       child: InkWell(
-                        onTap: () => setState(() => _selectedPaymentMethod = method),
+                        onTap: () =>
+                            setState(() => _selectedPaymentMethod = method),
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
                           height: 48,
@@ -331,16 +479,22 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                             children: [
                               Icon(
                                 method.icon,
-                                color: isMethSelected ? theme.primaryColor : Colors.white60,
+                                color: isMethSelected
+                                    ? theme.primaryColor
+                                    : Colors.white60,
                                 size: 16,
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 method.namePt,
                                 style: TextStyle(
-                                  color: isMethSelected ? Colors.white : Colors.white60,
+                                  color: isMethSelected
+                                      ? Colors.white
+                                      : Colors.white60,
                                   fontSize: 10,
-                                  fontWeight: isMethSelected ? FontWeight.bold : FontWeight.normal,
+                                  fontWeight: isMethSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ],
@@ -353,11 +507,29 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
               ),
               const SizedBox(height: 20),
 
+              // Switch Fatura do mês selecionado? (apenas para Crédito)
+              if (_selectedPaymentMethod ==
+                  TransactionPaymentMethod.credit) ...[
+                SwitchListTile(
+                  title: const Text('Fatura do mês selecionado?'),
+                  subtitle: const Text(
+                    'Se marcado, lança no mês escolhido. Se desmarcado, lança no mês seguinte.',
+                  ),
+                  value: _faturaMesSelecionado,
+                  activeThumbColor: theme.primaryColor,
+                  onChanged: (val) =>
+                      setState(() => _faturaMesSelecionado = val),
+                ),
+                const SizedBox(height: 10),
+              ],
+
               // Switch Compartilhar com a Família (apenas se fizer parte de uma família)
               if (_showShareOption) ...[
                 SwitchListTile(
                   title: const Text('Compartilhar com a Família'),
-                  subtitle: const Text('Disponibiliza esta transação para todos os membros.'),
+                  subtitle: const Text(
+                    'Disponibiliza esta transação para todos os membros.',
+                  ),
                   value: _isShared,
                   activeThumbColor: theme.primaryColor,
                   onChanged: (val) => setState(() => _isShared = val),
@@ -370,7 +542,9 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                 // Switch Dívida Pendente
                 SwitchListTile(
                   title: const Text('Dívida Pendente em Aberto'),
-                  subtitle: const Text('Exibe na aba Dívidas fora do fluxo mensal principal.'),
+                  subtitle: const Text(
+                    'Exibe na aba Dívidas fora do fluxo mensal principal.',
+                  ),
                   value: _isPending,
                   activeThumbColor: const Color(0xFFF43F5E),
                   onChanged: (val) {
@@ -396,7 +570,9 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                     // Switch Recorrência
                     SwitchListTile(
                       title: const Text('Despesa Recorrente'),
-                      subtitle: const Text('Repetir todo mês de forma contínua.'),
+                      subtitle: const Text(
+                        'Repetir todo mês de forma contínua.',
+                      ),
                       value: _isRecurring,
                       activeThumbColor: theme.primaryColor,
                       onChanged: (val) {
@@ -409,7 +585,9 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                     // Switch Parcelamento
                     SwitchListTile(
                       title: const Text('Parcelar Compra'),
-                      subtitle: const Text('Dividir valor em parcelas mensais.'),
+                      subtitle: const Text(
+                        'Dividir valor em parcelas mensais.',
+                      ),
                       value: _isInstallment,
                       activeThumbColor: Colors.amber,
                       onChanged: (val) {
@@ -421,10 +599,16 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                     ),
                     if (_isInstallment) ...[
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 8,
+                        ),
                         child: Row(
                           children: [
-                            const Text('Número de Parcelas: ', style: TextStyle(color: Colors.white70)),
+                            const Text(
+                              'Número de Parcelas: ',
+                              style: TextStyle(color: Colors.white70),
+                            ),
                             Expanded(
                               child: Slider(
                                 value: _installmentsCount.toDouble(),
@@ -433,10 +617,18 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                                 divisions: 22,
                                 label: '$_installmentsCount',
                                 activeColor: Colors.amber,
-                                onChanged: (val) => setState(() => _installmentsCount = val.round()),
+                                onChanged: (val) => setState(
+                                  () => _installmentsCount = val.round(),
+                                ),
                               ),
                             ),
-                            Text('$_installmentsCount', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(
+                              '$_installmentsCount',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -487,16 +679,14 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            cat.icon,
-                            color: cat.color,
-                            size: 24,
-                          ),
+                          Icon(cat.icon, color: cat.color, size: 24),
                           const SizedBox(height: 6),
                           Text(
                             cat.namePt,
                             style: TextStyle(
-                              color: isCatSelected ? Colors.white : Colors.white60,
+                              color: isCatSelected
+                                  ? Colors.white
+                                  : Colors.white60,
                               fontSize: 12,
                               fontWeight: isCatSelected
                                   ? FontWeight.w600
@@ -574,7 +764,9 @@ class _TypeButton extends StatelessWidget {
               : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? activeColor : darkSurfaceLight.withValues(alpha: 0.3),
+            color: isSelected
+                ? activeColor
+                : darkSurfaceLight.withValues(alpha: 0.3),
             width: 1.5,
           ),
         ),

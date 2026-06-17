@@ -14,105 +14,9 @@ import '../pages/login_page.dart';
 import '../pages/family_page.dart';
 
 class AppDrawer extends StatelessWidget {
-  final ValueChanged<int> onItemSelected;
+  final ValueChanged<int>? onItemSelected;
 
-  const AppDrawer({
-    super.key,
-    required this.onItemSelected,
-  });
-
-  void _showAboutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: Color(0xFF6366F1)),
-            SizedBox(width: 12),
-            Text(
-              'Sobre o Desp',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Desp — Controle Financeiro Premium',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Desenvolvido com Flutter e BLoC para entregar uma experiência moderna, reativa e offline-first com salvamento local via SQLite.',
-              style: TextStyle(color: Colors.white70, height: 1.4),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Versão: 1.0.0',
-              style: TextStyle(
-                color: Color(0xFF6366F1),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Fechar',
-              style: TextStyle(color: Color(0xFF6366F1)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.settings_rounded, color: Color(0xFF6366F1)),
-            SizedBox(width: 12),
-            Text(
-              'Configurações',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: const Text(
-          'As configurações do aplicativo estão pré-definidas para o modo escuro automático e persistência local offline de alta velocidade.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Entendi',
-              style: TextStyle(color: Color(0xFF6366F1)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  const AppDrawer({super.key, this.onItemSelected});
 
   Future<void> _exportBackup(BuildContext context) async {
     try {
@@ -143,8 +47,7 @@ class AppDrawer extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                  'Backup exportado com sucesso: ${basename(path)}'),
+              content: Text('Backup exportado com sucesso: ${basename(path)}'),
               backgroundColor: const Color(0xFF10B981),
             ),
           );
@@ -156,16 +59,24 @@ class AppDrawer extends StatelessWidget {
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFF0F172A),
-            title: const Text('Erro na Exportação',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Erro na Exportação',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             content: Text(
-                'Não foi possível exportar os dados: ${e.toString()}',
-                style: const TextStyle(color: Colors.white70)),
+              'Não foi possível exportar os dados: ${e.toString()}',
+              style: const TextStyle(color: Colors.white70),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Fechar',
-                    style: TextStyle(color: Color(0xFF6366F1))),
+                child: const Text(
+                  'Fechar',
+                  style: TextStyle(color: Color(0xFF6366F1)),
+                ),
               ),
             ],
           ),
@@ -190,8 +101,13 @@ class AppDrawer extends StatelessWidget {
             context: context,
             builder: (context) => AlertDialog(
               backgroundColor: const Color(0xFF0F172A),
-              title: const Text('Confirmar Importação',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: const Text(
+                'Confirmar Importação',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               content: const Text(
                 'Esta ação substituirá permanentemente todos os dados atuais do aplicativo pelo arquivo de backup selecionado. Deseja prosseguir?',
                 style: TextStyle(color: Colors.white70),
@@ -199,13 +115,16 @@ class AppDrawer extends StatelessWidget {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancelar',
-                      style: TextStyle(color: Colors.white60)),
+                  child: const Text(
+                    'Cancelar',
+                    style: TextStyle(color: Colors.white60),
+                  ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
                   style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFE11D48)),
+                    foregroundColor: const Color(0xFFE11D48),
+                  ),
                   child: const Text('Importar e Substituir'),
                 ),
               ],
@@ -241,8 +160,13 @@ class AppDrawer extends StatelessWidget {
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFF0F172A),
-            title: const Text('Erro na Importação',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Erro na Importação',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             content: Text(
               'O arquivo selecionado é inválido ou está corrompido.\n\nDetalhes: ${e.toString()}',
               style: const TextStyle(color: Colors.white70),
@@ -250,8 +174,10 @@ class AppDrawer extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Fechar',
-                    style: TextStyle(color: Color(0xFF6366F1))),
+                child: const Text(
+                  'Fechar',
+                  style: TextStyle(color: Color(0xFF6366F1)),
+                ),
               ),
             ],
           ),
@@ -286,137 +212,110 @@ class AppDrawer extends StatelessWidget {
                       children: [
                         // Header
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: theme.primaryColor.withValues(alpha: 0.5),
-                            width: 2,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 32,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: theme.primaryColor.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  child: Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      color: Color(0xFF6366F1),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      username,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                            color: Colors.white,
+                                          ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      email,
+                                      style: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 12,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: CircleAvatar(
-                          radius: 30,
-                          backgroundColor: const Color(0xFF1E293B),
-                          child: Text(
-                            initials,
-                            style: const TextStyle(
-                              color: Color(0xFF6366F1),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                            ),
+
+                        const Divider(color: Colors.white10, height: 1),
+
+                        const SizedBox(height: 16),
+
+                        // Navigation Items
+                        _DrawerItem(
+                          icon: Icons.people_rounded,
+                          title: 'Conta Família',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const FamilyPage(),
+                              ),
+                            );
+                          },
+                        ),
+
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 8,
                           ),
+                          child: Divider(color: Colors.white10, height: 1),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              username,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: Colors.white,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              email,
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 12,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+
+                        // Backup items
+                        _DrawerItem(
+                          icon: Icons.backup_rounded,
+                          title: 'Exportar Dados (Backup)',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _exportBackup(context);
+                          },
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                        _DrawerItem(
+                          icon: Icons.settings_backup_restore_rounded,
+                          title: 'Importar Dados (Backup)',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _importBackup(context);
+                          },
+                        ),
 
-                const Divider(color: Colors.white10, height: 1),
-
-                const SizedBox(height: 16),
-
-                // Navigation Items
-                _DrawerItem(
-                  icon: Icons.calendar_month_rounded,
-                  title: 'Visão Geral Mensal',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onItemSelected(0);
-                  },
-                ),
-                _DrawerItem(
-                  icon: Icons.assignment_late_rounded,
-                  title: 'Dívidas & Pendências',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onItemSelected(1);
-                  },
-                ),
-                _DrawerItem(
-                  icon: Icons.people_rounded,
-                  title: 'Conta Família',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const FamilyPage()),
-                    );
-                  },
-                ),
-
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: Divider(color: Colors.white10, height: 1),
-                ),
-
-                // Backup items
-                _DrawerItem(
-                  icon: Icons.backup_rounded,
-                  title: 'Exportar Dados (Backup)',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _exportBackup(context);
-                  },
-                ),
-                _DrawerItem(
-                  icon: Icons.settings_backup_restore_rounded,
-                  title: 'Importar Dados (Backup)',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _importBackup(context);
-                  },
-                ),
-
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: Divider(color: Colors.white10, height: 1),
-                ),
-
-                // Utility Items
-                _DrawerItem(
-                  icon: Icons.settings_rounded,
-                  title: 'Configurações',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _showSettingsDialog(context);
-                  },
-                ),
-                _DrawerItem(
-                  icon: Icons.info_outline_rounded,
-                  title: 'Sobre o Desp',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _showAboutDialog(context);
-                  },
-                ),
                       ],
                     ),
                   ),
@@ -486,9 +385,7 @@ class _DrawerItem extends StatelessWidget {
             fontSize: 14,
           ),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         horizontalTitleGap: 8,
         dense: true,
       ),

@@ -19,6 +19,7 @@ class TransactionModel extends Transaction {
     super.familyId,
     super.isShared,
     super.description,
+    super.groupId,
   });
 
   factory TransactionModel.fromEntity(Transaction transaction) {
@@ -40,6 +41,7 @@ class TransactionModel extends Transaction {
       familyId: transaction.familyId,
       isShared: transaction.isShared,
       description: transaction.description,
+      groupId: transaction.groupId,
     );
   }
 
@@ -62,6 +64,7 @@ class TransactionModel extends Transaction {
       familyId: map['familyId'] as String?,
       isShared: map['isShared'] == true || map['isShared'] == 1,
       description: map['description'] as String?,
+      groupId: map['groupId'] as String?,
     );
   }
 
@@ -84,6 +87,7 @@ class TransactionModel extends Transaction {
       'familyId': familyId,
       'isShared': isShared ? 1 : 0,
       'description': description,
+      'groupId': groupId,
     };
   }
 }

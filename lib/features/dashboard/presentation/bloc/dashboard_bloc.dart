@@ -1,11 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/repositories/transaction_repository.dart';
+import '../../data/services/auth_service.dart';
 import 'dashboard_event.dart';
 import 'dashboard_state.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final TransactionRepository repository;
+  String? _selectedMemberId;
 
   DashboardBloc({required this.repository}) : super(DashboardInitial()) {
     on<LoadDashboard>(_onLoadDashboard);
@@ -16,12 +18,20 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     on<QuitDebt>(_onQuitDebt);
     on<UpdateTransaction>(_onUpdateTransaction);
     on<MarkAllTransactionsAsPaid>(_onMarkAllTransactionsAsPaid);
+    on<ChangeMemberFilter>(_onChangeMemberFilter);
   }
 
   Future<void> _onLoadDashboard(
     LoadDashboard event,
     Emitter<DashboardState> emit,
   ) async {
+    // Preservar o filtro atual
+    if (event.selectedMemberId != null) {
+      _selectedMemberId = event.selectedMemberId;
+    } else if (state is DashboardLoaded) {
+      _selectedMemberId = (state as DashboardLoaded).selectedMemberId;
+    }
+
     if (!event.isSilent) {
       emit(DashboardLoading());
     }
@@ -32,10 +42,15 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       );
       final debts = await repository.getPendingDebts();
 
+      final currentUser = await AuthService.instance.getCurrentUser();
+      final currentUserId = currentUser?.uid;
+
       emit(DashboardLoaded(
         transactions: transactions,
         debts: debts,
         targetMonth: event.targetMonth,
+        selectedMemberId: _selectedMemberId,
+        currentUserId: currentUserId,
       ));
     } catch (e) {
       emit(DashboardError('Erro ao carregar dashboard: ${e.toString()}'));
@@ -69,6 +84,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
               installmentNumber: i,
               totalInstallments: event.totalInstallments,
               installmentParentId: baseTx.id,
+              groupId: baseTx.id,
               isPaid: i == 1 ? baseTx.isPaid : false,
               isPending: baseTx.isPending,
             ),
@@ -87,6 +103,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
               id: '${baseTx.id}_$i',
               date: recurringDate,
               recurrenceParentId: baseTx.id,
+              groupId: baseTx.id,
               isPaid: i == 1 ? baseTx.isPaid : false,
               isPending: false,
             ),
@@ -110,7 +127,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     Emitter<DashboardState> emit,
   ) async {
     try {
-      await repository.saveTransaction(event.transaction);
+      await repository.saveTransactionWithScope(event.transaction, event.editScope);
       add(LoadDashboard(targetMonth: event.targetMonth));
     } catch (e) {
       emit(DashboardError('Erro ao atualizar transação: ${e.toString()}'));
@@ -122,7 +139,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     Emitter<DashboardState> emit,
   ) async {
     try {
-      await repository.deleteTransaction(event.transactionId);
+      await repository.deleteTransactionWithScope(event.transaction, event.deleteScope);
       add(LoadDashboard(targetMonth: event.targetMonth));
     } catch (e) {
       emit(DashboardError('Erro ao deletar transação: ${e.toString()}'));
@@ -153,6 +170,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
           transactions: currentState.transactions,
           debts: debts,
           targetMonth: currentState.targetMonth,
+          selectedMemberId: _selectedMemberId,
+          currentUserId: currentState.currentUserId,
         ));
       } catch (e) {
         emit(DashboardError('Erro ao carregar dívidas: ${e.toString()}'));
@@ -187,6 +206,23 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       add(LoadDashboard(targetMonth: event.targetMonth));
     } catch (e) {
       emit(DashboardError('Erro ao quitar todas as despesas: ${e.toString()}'));
+    }
+  }
+
+  void _onChangeMemberFilter(
+    ChangeMemberFilter event,
+    Emitter<DashboardState> emit,
+  ) {
+    _selectedMemberId = event.selectedMemberId;
+    if (state is DashboardLoaded) {
+      final currentState = state as DashboardLoaded;
+      emit(DashboardLoaded(
+        transactions: currentState.transactions,
+        debts: currentState.debts,
+        targetMonth: currentState.targetMonth,
+        selectedMemberId: _selectedMemberId,
+        currentUserId: currentState.currentUserId,
+      ));
     }
   }
 
