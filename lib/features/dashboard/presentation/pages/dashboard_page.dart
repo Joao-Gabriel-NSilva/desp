@@ -12,6 +12,7 @@ import '../widgets/add_transaction_dialog.dart';
 import '../widgets/category_helper.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/transaction_list_item.dart';
+import '../widgets/search_and_filters_bar.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -21,6 +22,8 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  bool _isFiltersExpanded = true;
+
   @override
   void initState() {
     super.initState();
@@ -336,98 +339,143 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ),
 
-                    // Seletor de Mês/Ano (com DatePicker no click)
+                    // Filtros e Período Colapsável (Data, Membros e Busca)
                     SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: theme.cardTheme.color,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.04),
-                              width: 1,
+                      child: Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isFiltersExpanded = !_isFiltersExpanded;
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Período & Filtros',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: const Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Icon(
+                                    _isFiltersExpanded
+                                        ? Icons.keyboard_arrow_up_rounded
+                                        : Icons.keyboard_arrow_down_rounded,
+                                    color: const Color(0xFF64748B),
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.chevron_left_rounded, color: Colors.white60),
-                                onPressed: () {
-                                  final prevMonth = DateTime(currentMonth.year, currentMonth.month - 1);
-                                  context.read<DashboardBloc>().add(LoadDashboard(targetMonth: prevMonth));
-                                },
-                              ),
-                              InkWell(
-                                onTap: () async {
-                                  final DateTime? picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: currentMonth,
-                                    firstDate: DateTime(2020),
-                                    lastDate: DateTime(2030),
-                                    helpText: 'SELECIONE O MÊS E ANO',
-                                    builder: (context, child) {
-                                      return Theme(
-                                        data: theme.copyWith(
-                                          colorScheme: theme.colorScheme.copyWith(
-                                            primary: theme.primaryColor,
-                                            onPrimary: Colors.white,
-                                            surface: const Color(0xFF1E293B),
-                                            onSurface: Colors.white,
+                          ClipRect(
+                            child: AnimatedSize(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOut,
+                              child: _isFiltersExpanded
+                                  ? Column(
+                                      children: [
+                                        // Seletor de Mês/Ano (com DatePicker no click)
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: theme.cardTheme.color,
+                                              borderRadius: BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color: Colors.white.withValues(alpha: 0.04),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.chevron_left_rounded, color: Colors.white60),
+                                                  onPressed: () {
+                                                    final prevMonth = DateTime(currentMonth.year, currentMonth.month - 1);
+                                                    context.read<DashboardBloc>().add(LoadDashboard(targetMonth: prevMonth));
+                                                  },
+                                                ),
+                                                InkWell(
+                                                  onTap: () async {
+                                                    final DateTime? picked = await showDatePicker(
+                                                      context: context,
+                                                      initialDate: currentMonth,
+                                                      firstDate: DateTime(2020),
+                                                      lastDate: DateTime(2030),
+                                                      helpText: 'SELECIONE O MÊS E ANO',
+                                                      builder: (context, child) {
+                                                        return Theme(
+                                                          data: theme.copyWith(
+                                                            colorScheme: theme.colorScheme.copyWith(
+                                                              primary: theme.primaryColor,
+                                                              onPrimary: Colors.white,
+                                                              surface: const Color(0xFF1E293B),
+                                                              onSurface: Colors.white,
+                                                            ),
+                                                          ),
+                                                          child: child!,
+                                                        );
+                                                      },
+                                                    );
+                                                    if (picked != null && context.mounted) {
+                                                      final target = DateTime(picked.year, picked.month);
+                                                      context.read<DashboardBloc>().add(LoadDashboard(targetMonth: target));
+                                                    }
+                                                  },
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          '${_getMonthName(currentMonth.month)} de ${currentMonth.year}',
+                                                          style: const TextStyle(
+                                                            fontSize: 16,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        const Icon(
+                                                          Icons.arrow_drop_down_rounded,
+                                                          color: Colors.white60,
+                                                          size: 20,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.chevron_right_rounded, color: Colors.white60),
+                                                  onPressed: () {
+                                                    final nextMonth = DateTime(currentMonth.year, currentMonth.month + 1);
+                                                    context.read<DashboardBloc>().add(LoadDashboard(targetMonth: nextMonth));
+                                                  },
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
-                                        child: child!,
-                                      );
-                                    },
-                                  );
-                                  if (picked != null && context.mounted) {
-                                    final target = DateTime(picked.year, picked.month);
-                                    context.read<DashboardBloc>().add(LoadDashboard(targetMonth: target));
-                                  }
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '${_getMonthName(currentMonth.month)} de ${currentMonth.year}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      const Icon(
-                                        Icons.arrow_drop_down_rounded,
-                                        color: Colors.white60,
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.chevron_right_rounded, color: Colors.white60),
-                                onPressed: () {
-                                  final nextMonth = DateTime(currentMonth.year, currentMonth.month + 1);
-                                  context.read<DashboardBloc>().add(LoadDashboard(targetMonth: nextMonth));
-                                },
-                              ),
-                            ],
+                                        if (user?.familyId != null)
+                                          _buildMemberFilterChips(context, currentUserId, user!.familyId!, state.selectedMemberId),
+                                        const SearchAndFiltersBar(),
+                                      ],
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
-
-                    if (user?.familyId != null)
-                      SliverToBoxAdapter(
-                        child: _buildMemberFilterChips(context, currentUserId, user!.familyId!, state.selectedMemberId),
-                      ),
 
                     // Cards Resumo
                     SliverToBoxAdapter(

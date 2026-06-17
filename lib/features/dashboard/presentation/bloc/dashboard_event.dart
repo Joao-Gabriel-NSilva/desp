@@ -116,3 +116,20 @@ class ChangeMemberFilter extends DashboardEvent {
   @override
   List<Object?> get props => [selectedMemberId];
 }
+
+class ChangeAdvancedFilters extends DashboardEvent {
+  final String? searchQuery;
+  final TransactionCategory? selectedCategory;
+  final TransactionPaymentMethod? selectedPaymentMethod;
+  final bool? selectedPaidStatus; // null: todos, true: pago, false: não pago
+
+  const ChangeAdvancedFilters({
+    this.searchQuery,
+    this.selectedCategory,
+    this.selectedPaymentMethod,
+    this.selectedPaidStatus,
+  });
+
+  @override
+  List<Object?> get props => [searchQuery, selectedCategory, selectedPaymentMethod, selectedPaidStatus];
+}

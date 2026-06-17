@@ -8,6 +8,10 @@ import 'dashboard_state.dart';
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final TransactionRepository repository;
   String? _selectedMemberId;
+  String _searchQuery = '';
+  TransactionCategory? _selectedCategory;
+  TransactionPaymentMethod? _selectedPaymentMethod;
+  bool? _selectedPaidStatus;
 
   DashboardBloc({required this.repository}) : super(DashboardInitial()) {
     on<LoadDashboard>(_onLoadDashboard);
@@ -19,6 +23,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     on<UpdateTransaction>(_onUpdateTransaction);
     on<MarkAllTransactionsAsPaid>(_onMarkAllTransactionsAsPaid);
     on<ChangeMemberFilter>(_onChangeMemberFilter);
+    on<ChangeAdvancedFilters>(_onChangeAdvancedFilters);
   }
 
   Future<void> _onLoadDashboard(
@@ -51,6 +56,10 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         targetMonth: event.targetMonth,
         selectedMemberId: _selectedMemberId,
         currentUserId: currentUserId,
+        searchQuery: _searchQuery,
+        selectedCategory: _selectedCategory,
+        selectedPaymentMethod: _selectedPaymentMethod,
+        selectedPaidStatus: _selectedPaidStatus,
       ));
     } catch (e) {
       emit(DashboardError('Erro ao carregar dashboard: ${e.toString()}'));
@@ -172,6 +181,10 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
           targetMonth: currentState.targetMonth,
           selectedMemberId: _selectedMemberId,
           currentUserId: currentState.currentUserId,
+          searchQuery: _searchQuery,
+          selectedCategory: _selectedCategory,
+          selectedPaymentMethod: _selectedPaymentMethod,
+          selectedPaidStatus: _selectedPaidStatus,
         ));
       } catch (e) {
         emit(DashboardError('Erro ao carregar dívidas: ${e.toString()}'));
@@ -222,6 +235,35 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         targetMonth: currentState.targetMonth,
         selectedMemberId: _selectedMemberId,
         currentUserId: currentState.currentUserId,
+        searchQuery: _searchQuery,
+        selectedCategory: _selectedCategory,
+        selectedPaymentMethod: _selectedPaymentMethod,
+        selectedPaidStatus: _selectedPaidStatus,
+      ));
+    }
+  }
+
+  void _onChangeAdvancedFilters(
+    ChangeAdvancedFilters event,
+    Emitter<DashboardState> emit,
+  ) {
+    if (event.searchQuery != null) _searchQuery = event.searchQuery!;
+    _selectedCategory = event.selectedCategory;
+    _selectedPaymentMethod = event.selectedPaymentMethod;
+    _selectedPaidStatus = event.selectedPaidStatus;
+
+    if (state is DashboardLoaded) {
+      final currentState = state as DashboardLoaded;
+      emit(DashboardLoaded(
+        transactions: currentState.transactions,
+        debts: currentState.debts,
+        targetMonth: currentState.targetMonth,
+        selectedMemberId: _selectedMemberId,
+        currentUserId: currentState.currentUserId,
+        searchQuery: _searchQuery,
+        selectedCategory: _selectedCategory,
+        selectedPaymentMethod: _selectedPaymentMethod,
+        selectedPaidStatus: _selectedPaidStatus,
       ));
     }
   }

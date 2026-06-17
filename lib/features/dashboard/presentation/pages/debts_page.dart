@@ -11,6 +11,7 @@ import '../../data/services/auth_service.dart';
 import '../../data/services/family_service.dart';
 import '../../domain/entities/user_profile.dart';
 import 'transaction_detail_page.dart';
+import '../widgets/search_and_filters_bar.dart';
 
 class DebtsPage extends StatefulWidget {
   const DebtsPage({super.key});
@@ -22,6 +23,7 @@ class DebtsPage extends StatefulWidget {
 class _DebtsPageState extends State<DebtsPage> {
   String? _currentUserId;
   String? _familyId;
+  bool _isFiltersExpanded = true;
 
   @override
   void initState() {
@@ -125,10 +127,57 @@ class _DebtsPageState extends State<DebtsPage> {
                     ),
                   ),
 
-                  if (_familyId != null && _currentUserId != null)
-                    SliverToBoxAdapter(
-                      child: _buildMemberFilterChips(context, _currentUserId!, _familyId!, state.selectedMemberId),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isFiltersExpanded = !_isFiltersExpanded;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Filtros & Busca',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: const Color(0xFF64748B),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Icon(
+                                  _isFiltersExpanded
+                                      ? Icons.keyboard_arrow_up_rounded
+                                      : Icons.keyboard_arrow_down_rounded,
+                                  color: const Color(0xFF64748B),
+                                  size: 18,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        ClipRect(
+                          child: AnimatedSize(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                            child: _isFiltersExpanded
+                                ? Column(
+                                    children: [
+                                      if (_familyId != null && _currentUserId != null)
+                                        _buildMemberFilterChips(context, _currentUserId!, _familyId!, state.selectedMemberId),
+                                      const SearchAndFiltersBar(),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
 
                   // Total Acumulado Card
                   SliverToBoxAdapter(
